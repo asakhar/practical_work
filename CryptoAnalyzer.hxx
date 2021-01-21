@@ -2,8 +2,9 @@
 #define CRYPTOANYLIZER_HXX
 
 #include "SubstitutionCipher.hxx"
+#include <unordered_map>
 
-class Anylizer {
+class Analyzer {
   
 };
 
