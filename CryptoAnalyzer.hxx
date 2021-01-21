@@ -1,5 +1,5 @@
-#ifndef CRYPTOANYLIZER_HXX
-#define CRYPTOANYLIZER_HXX
+#ifndef CRYPTOANALYZER_HXX
+#define CRYPTOANALYZER_HXX
 
 #include "SubstitutionCipher.hxx"
 #include <unordered_map>
@@ -8,4 +8,4 @@ class Analyzer {
   
 };
 
-#endif // CRYPTOANYLIZER_HXX
+#endif // CRYPTOANALYZER_HXX

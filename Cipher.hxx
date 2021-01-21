@@ -62,6 +62,8 @@ public:
       ss.put(enumerate(item));
     return ss.str();
   }
+
+  inline size_t size() const { return m_Let2Pos.size(); }
 };
 
 template <Key Key_t>

@@ -120,7 +120,10 @@ public:
   AffineKey() = default;
   AffineKey(RingElem<int64_t> a, RingElem<int64_t> b) : alpha{a}, beta{b} {};
   AffineKey(int64_t a, int64_t b, int64_t m) : alpha{a, m}, beta{b, m} {};
-  int64_t apply(int64_t in) const { return static_cast<int64_t>(alpha * (in - 1) + beta) + 1; }
+  int64_t apply(int64_t in) const
+  {
+    return static_cast<int64_t>(alpha * (in - 1) + beta) + 1;
+  }
   int64_t cancel(int64_t out) const
   {
     return static_cast<int64_t>((-beta + (out - 1)) * ~alpha) + 1;
@@ -131,6 +134,11 @@ public:
 class AffineCipher : public Cipher<AffineKey>
 {
 public:
+  AffineCipher() = default;
+  AffineCipher(Alphabet const& abc, int64_t alpha, int64_t beta) {
+    updateAbc(abc);
+    updateKey({alpha, beta, abc.size()});
+  }
   std::string encode(std::string_view msg) const override
   {
     auto encmsg = m_abc.enumerate(msg);
