@@ -1,3 +1,0 @@
-/data/Source/practical_work/build/CMakeFiles/rebuild_cache.dir
-/data/Source/practical_work/build/CMakeFiles/edit_cache.dir
-/data/Source/practical_work/build/CMakeFiles/Dialog.dir
