@@ -313,6 +313,7 @@ public:
     for (auto& kv : rhs)
     {
       auto lhsres = lhs.at(kv.first);
+      // lhsres *= rhs.size()/lhs.size();
       auto tres   = std::abs(kv.second - lhsres);
       res += tres;
     }
@@ -321,7 +322,8 @@ public:
   }
 
   std::string try_analyze(std::string_view msg, double alpha, double beta,
-                          double precision) const
+                          double precision, bool shuffle = true,
+                          bool only_letters = false) const
   {
     std::random_device rd;
     std::mt19937 rand(rd());
@@ -330,7 +332,8 @@ public:
     abc.update_from_text(msg.data());
     auto initial = abc.getLetters();
     auto guessed = initial;
-    std::shuffle(guessed.begin(), guessed.end(), rand);
+    if (shuffle)
+      std::shuffle(guessed.begin(), guessed.end(), rand);
 
     SubstitutionCipher cipher;
     cipher.updateAbc(abc);
@@ -357,13 +360,17 @@ public:
   mse_2gramms  = calc_mean_abs_error(m_ngm2freq[1], resolved_2gr);             \
   mse_1gramms  = calc_mean_abs_error(m_ngm2freq[0], resolved_1gr);             \
   mse_3gramms  = calc_mean_abs_error(m_ngm2freq[2], resolved_3gr);             \
-  total_mse =                                                                  \
-      alpha * mse_1gramms + (1 - alpha) * mse_2gramms + beta * mse_3gramms;
-  // mse_letters  = calc_mean_abs_error(m_symb2freq, resolved_let);               \
+  total_mse    = alpha * mse_1gramms + beta * mse_2gramms +                    \
+              (1 - alpha - beta) * mse_3gramms;
+    // mse_letters  = calc_mean_abs_error(m_symb2freq, resolved_let);               \
   // mse_bigramms = calc_mean_abs_error(m_bigr2freq, resolved_big);               \
   // resolved_let = count_frequencies(guess_msg);                                 \
   // resolved_big = count_bigramms(guess_msg);                                    \
 
+    // 0.4 0.6 0.5
+    // 0.266 0.4 0.33333
+    // alpha = 0.266
+    // beta = 0.4
     RECALCULATE();
     // mse_1gramms = calc_mean_abs_error(m_ngm2freq[0], resolved_1gr);
 
@@ -373,24 +380,29 @@ public:
       auto a = rand() % abc.size(), b = rand() % abc.size();
       while (a == b)
         b = rand() % abc.size();
-      std::swap(guessed[a], guessed[b]);
-      cipher.swap_lets(abc.enumerate(guessed[a]), abc.enumerate(guessed[b]));
-      // cipher.updateKey({initial, guessed, abc});
-      RECALCULATE();
+      char ga = guessed[a], gb = guessed[b];
+      if (((ga >= 'a' && ga <= 'z') || (ga >= 'A' && ga <= 'Z')) &&
+              ((gb >= 'a' && gb <= 'z') || (gb >= 'A' && gb <= 'Z')) ||
+          !only_letters)
+      {
+        std::swap(guessed[a], guessed[b]);
+        cipher.swap_lets(abc.enumerate(guessed[a]), abc.enumerate(guessed[b]));
+        RECALCULATE();
+      }
       if (total_mse > prev_mse)
       {
         std::swap(guessed[a], guessed[b]);
         cipher.swap_lets(abc.enumerate(guessed[a]), abc.enumerate(guessed[b]));
-        // cipher.updateKey({initial, guessed, abc});
-        RECALCULATE();
+        total_mse = prev_mse;
+        // RECALCULATE();
       }
 #ifdef DEBUG
       if (prev_mse != total_mse)
-        std::cout << "Total_mse: " << std::setprecision(9) << total_mse
-                  << "    Mse_letters: " << std::setprecision(9) << mse_letters
-                  << "    Mse_bigramms: " << std::setprecision(9)
-                  << mse_bigramms << "    Mse_3gramms: " << std::setprecision(9)
-                  << mse_3gramms << "\n"
+        std::cout << "\n\n\nTotal_mse: " << std::setprecision(9) << total_mse
+                  << "    Mse_letters: " << std::setprecision(9) << mse_1gramms
+                  << "    Mse_bigramms: " << std::setprecision(9) << mse_2gramms
+                  << "    Mse_3gramms: " << std::setprecision(9) << mse_3gramms
+                  << "\n\n"
                   << guess_msg << std::endl;
 #endif
     }
