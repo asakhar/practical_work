@@ -23,6 +23,11 @@ public:
       m_backward[out[i]] = in[i];
     }
   }
+  void swap_lets(int64_t rhs, int64_t lhs)
+  {
+    std::swap(m_forward[rhs], m_forward[lhs]);
+    std::swap(m_backward[m_forward[rhs]], m_backward[m_forward[lhs]]);
+  }
   SubstitutionKey(std::string_view in, std::string_view out,
                   Alphabet const& abc)
   {
@@ -51,6 +56,7 @@ public:
       ss.put(m_key.apply(item));
     return m_abc.get(ss.str());
   };
+  void swap_lets(int64_t rhs, int64_t lhs) { m_key.swap_lets(rhs, lhs); }
   std::string decode(std::string_view msg) const override
   {
     auto encmsg = m_abc.enumerate(msg);

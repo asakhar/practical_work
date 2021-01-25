@@ -42,6 +42,26 @@ public:
       pos++;
     }
   }
+  void update_from_text(std::string_view text)
+  {
+    m_Let2Pos.clear();
+    m_Pos2Let.clear();
+    for (int64_t pos = 1; auto symb : text)
+      if (m_Let2Pos.find(symb) == m_Let2Pos.end())
+      {
+        m_Let2Pos[symb] = pos;
+        m_Pos2Let[pos]  = symb;
+        pos++;
+      }
+  }
+
+  std::string getLetters() const
+  {
+    std::stringstream ss;
+    for (auto& kv : m_Let2Pos)
+      ss << kv.first;
+    return ss.str();
+  }
 
   inline char get(int64_t pos) const { return m_Pos2Let.at(pos); }
 
