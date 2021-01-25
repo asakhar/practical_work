@@ -111,7 +111,7 @@ int main(int argc, char const* argv[])
   std::string to_decrypt =
 #include "testtext.txt"
       ;
-  auto decr = an.try_analyze(to_decrypt, 0.26666, 0.4, 0.000001, false, false);
+  auto decr = an.try_analyze(to_decrypt, 0.26666, 0.4, 0.00068, true, false);
 #endif
   std::cout << "\n\n" << decr << "\n\n";
 

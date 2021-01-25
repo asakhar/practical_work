@@ -254,6 +254,8 @@ public:
           prev.put(static_cast<Char_t>(std::tolower(ch)));
         else
           prev.put(ch);
+      }else {
+        prev.str("");
       }
     }
     for (auto& item : resolved_freqs)
