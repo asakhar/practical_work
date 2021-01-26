@@ -3,8 +3,127 @@
 #include "Cipher.hxx"
 #include "CryptoAnalyzer.hxx"
 #include "SubstitutionCipher.hxx"
+#include <clocale>
 #include <iostream>
 
+using std::literals::string_view_literals::operator""sv;
+
+static constexpr auto text = L"Какой-то текст! Blah-blah-blah."sv;
+static constexpr auto abc_expr = L"A-Za-zА-Яа-я"sv;
+
+int example1(Alphabet<wchar_t> const& abc)
+{
+  SubstitutionCipher subcipher;
+  subcipher.updateAbc(abc);
+
+  auto initabc = abc.getLetters();
+  auto shufabc = initabc;
+  std::shuffle(shufabc.begin(), shufabc.end(), std::random_device{});
+  subcipher.updateKey(
+      {std::wstring_view{initabc}, std::wstring_view{shufabc}, abc});
+
+  std::wcout << L"Substitution cipher result:\n " << subcipher.encode(text)
+             << std::endl;
+  std::wcout << L"\nSubstitution cipher recovered:\n "
+             << subcipher.decode(subcipher.encode(text)) << L"\n"
+             << std::endl;
+
+  return 0;
+}
+int example2(Alphabet<wchar_t> const& abc)
+{
+  AffineCipher cipher;
+  cipher.updateAbc(abc);
+
+  cipher.updateKey({7, 3, (int64_t)abc.size()});
+
+  std::wcout << L"Affine cipher result:\n " << cipher.encode(text) << std::endl;
+  std::wcout << L"\nAffine cipher recovered:\n "
+             << cipher.decode(cipher.encode(text)) << L"\n"
+             << std::endl;
+  return 0;
+}
+int example3(Alphabet<wchar_t> const& abc)
+{
+  AffineRecursiveCipher cipher;
+  cipher.updateAbc(abc);
+
+  cipher.updateKey({{(int64_t)abc.size() - 1, 3, (int64_t)abc.size()},
+                    {(int64_t)abc.size() - 3, 7, (int64_t)abc.size()}});
+
+  std::wcout << L"Affine recursive cipher result:\n " << cipher.encode(text)
+             << std::endl;
+  std::wcout << L"\nAffine recursive cipher recovered:\n "
+             << cipher.decode(cipher.encode(text)) << L"\n"
+             << std::endl;
+
+  return 0;
+}
+
+int example4(Alphabet<wchar_t> const& abc)
+{
+  AffineCipher cipher;
+  cipher.updateAbc(abc);
+
+  cipher.updateKey({7, 3, (int64_t)abc.size()});
+
+  Analyzer<wchar_t> an{"../ngramms.csv"};
+
+#if 0
+  an.save_ngramms("../ngramms.csv", an.count_ngramms(
+#include "inittext.txt"
+                                        , 1, abc));
+  an.save_ngramms("../ngramms.csv", an.count_ngramms(
+#include "inittext.txt"
+                                        , 2, abc));
+  an.save_ngramms("../ngramms.csv", an.count_ngramms(
+#include "inittext.txt"
+                                        , 3, abc));
+  return 0;
+#endif
+
+  auto result = an.try_analyze_affine(cipher.encode(std::wstring_view{
+#include "testtext.txt"
+                                      }),
+                                      0.3, 0.2, 0.0009, abc);
+
+  std::wcout << result << std::endl;
+  return 0;
+}
+
+
+int example5(Alphabet<wchar_t> const& abc1)
+{
+  AffineRecursiveCipher cipher;
+  Alphabet abc{L"a-z"sv, true};
+  cipher.updateAbc(abc);
+
+  cipher.updateKey({{7, 3, (int64_t)abc.size()}, {3, 15, (int64_t)abc.size()}});
+
+  Analyzer<wchar_t> an{"../ngramms.csv"};
+
+  auto result = an.try_analyze_raffine(cipher.encode(std::wstring_view{
+#include "testtext.txt"
+                                      }),
+                                      0.2, 0, 0.0009, abc);
+
+  std::wcout << result << std::endl;
+  return 0;
+}
+
+int main(int argc, char const* argv[])
+{
+  setlocale(LC_ALL, "");
+  Alphabet abc{abc_expr, true};
+  example1(abc);
+  example2(abc);
+  example3(abc);
+  example5(abc);
+
+  return 0;
+}
+
+/*
 int main(int argc, char const* argv[])
 {
   Alphabet abc{"abcdefghijklmnopqrstuvwxyz"};
@@ -40,7 +159,8 @@ int main(int argc, char const* argv[])
       ;
   abc.update_from_text(msg);
   afc.updateAbc(abc);
-  afc.updateKey({static_cast<int64_t>(abc.size())-1, 5, static_cast<int64_t>(abc.size())});
+  afc.updateKey({static_cast<int64_t>(abc.size())-1, 5,
+static_cast<int64_t>(abc.size())});
 
   auto encrypted1 = afc.encode(msg);
   auto result1 = an.try_analyze_affine(encrypted1, 0.2, 0.3, abc);
@@ -55,11 +175,16 @@ int main(int argc, char const* argv[])
 #endif
 
 #if 0
-  std::string to_decrypt = R"(miRpD ANYtD XY YXDNsa ftDDa rpMr iL rlp NRXJrXJg UJf raNpYprrXJg XJftYrRa. miRpD ANYtD lUY bppJ rlp XJftYrRa'Y YrUJfURf ftDDa rpMr pkpR YXJyp rlp 1500Y, FlpJ UJ tJzJiFJ NRXJrpR riiz U gUsspa iL raNp UJf YyRUDbspf Xr ri DUzp U raNp YNpyXDpJ biiz. Ar lUY YtRkXkpf Jir iJsa LXkp ypJrtRXpY, btr UsYi rlp spUN XJri pspyrRiJXy raNpYprrXJg, RpDUXJXJg pYYpJrXUssa tJylUJgpf. Ar FUY NiNtsURXYpf XJ rlp 1960Y FXrl rlp RpspUYp iL mprRUYpr YlpprY yiJrUXJXJg miRpD ANYtD NUYYUgpY, UJf DiRp RpypJrsa FXrl fpYzriN NtbsXYlXJg YiLrFURp sXzp qsftY cUgpEUzpR XJystfXJg kpRYXiJY iL miRpD ANYtD.)";
-  auto decr = an.try_analyze(to_decrypt, 0.2, 0.2, 0.000001, false, true);
-#else
-  std::string to_decrypt =
-#include "testtext.txt"
+  std::string to_decrypt = R"(miRpD ANYtD XY YXDNsa ftDDa rpMr iL rlp NRXJrXJg
+UJf raNpYprrXJg XJftYrRa. miRpD ANYtD lUY bppJ rlp XJftYrRa'Y YrUJfURf ftDDa
+rpMr pkpR YXJyp rlp 1500Y, FlpJ UJ tJzJiFJ NRXJrpR riiz U gUsspa iL raNp UJf
+YyRUDbspf Xr ri DUzp U raNp YNpyXDpJ biiz. Ar lUY YtRkXkpf Jir iJsa LXkp
+ypJrtRXpY, btr UsYi rlp spUN XJri pspyrRiJXy raNpYprrXJg, RpDUXJXJg pYYpJrXUssa
+tJylUJgpf. Ar FUY NiNtsURXYpf XJ rlp 1960Y FXrl rlp RpspUYp iL mprRUYpr YlpprY
+yiJrUXJXJg miRpD ANYtD NUYYUgpY, UJf DiRp RpypJrsa FXrl fpYzriN NtbsXYlXJg
+YiLrFURp sXzp qsftY cUgpEUzpR XJystfXJg kpRYXiJY iL miRpD ANYtD.)"; auto decr =
+an.try_analyze(to_decrypt, 0.2, 0.2, 0.000001, false, true); #else std::string
+to_decrypt = #include "testtext.txt"
       ;
   std::cin.get();
   auto decr = an.try_analyze(to_decrypt, 0.26666, 0.4, 0.00068, true, false);
@@ -84,3 +209,5 @@ int main(int argc, char const* argv[])
 // AffineKey keyaff{akey, ckey};
 // auto app = keyaff.apply(4l); // 9
 // auto res228 = keyaff.cancel(app); // 4
+
+*/

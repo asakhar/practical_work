@@ -28,8 +28,9 @@ public:
     std::swap(m_forward[rhs], m_forward[lhs]);
     std::swap(m_backward[m_forward[rhs]], m_backward[m_forward[lhs]]);
   }
-  SubstitutionKey(std::string_view in, std::string_view out,
-                  Alphabet const& abc)
+  template<typename Char_t>
+  SubstitutionKey(std::basic_string_view<Char_t> in, std::basic_string_view<Char_t> out,
+                  Alphabet<Char_t> const& abc)
   {
     assert(in.size() == out.size() && "Size mismatch");
     m_forward.reserve(in.size());
@@ -44,26 +45,32 @@ public:
   int64_t cancel(int64_t out) const { return m_backward.at(out); }
 };
 
-class SubstitutionCipher : public Cipher<SubstitutionKey>
+template<typename Char_t = wchar_t>
+class SubstitutionCipher : public Cipher<SubstitutionKey, Char_t>
 {
+  using _Base = Cipher<SubstitutionKey, Char_t>;
 public:
   SubstitutionCipher() = default;
-  std::string encode(std::string_view msg) const override
+  std::basic_string<Char_t> encode(std::basic_string_view<Char_t> msg) const override
   {
-    auto encmsg = m_abc.enumerate(msg);
-    std::basic_stringstream<int64_t> ss;
-    for (auto item : encmsg)
-      ss.put(m_key.apply(item));
-    return m_abc.get(ss.str());
+    std::basic_stringstream<Char_t> ss;
+    for (auto item : msg)
+      if(_Base::m_abc.has(item))
+        ss.put(_Base::m_abc.get(_Base::m_key.apply(_Base::m_abc.enumerate(item))));
+      else
+        ss.put(item);
+    return ss.str();
   };
-  void swap_lets(int64_t rhs, int64_t lhs) { m_key.swap_lets(rhs, lhs); }
-  std::string decode(std::string_view msg) const override
+  void swap_lets(int64_t rhs, int64_t lhs) { _Base::m_key.swap_lets(rhs, lhs); }
+  std::basic_string<Char_t> decode(std::basic_string_view<Char_t> msg) const override
   {
-    auto encmsg = m_abc.enumerate(msg);
-    std::basic_stringstream<int64_t> ss;
-    for (auto item : encmsg)
-      ss.put(m_key.cancel(item));
-    return m_abc.get(ss.str());
+    std::basic_stringstream<Char_t> ss;
+    for (auto item : msg)
+      if(_Base::m_abc.has(item))
+        ss.put(_Base::m_abc.get(_Base::m_key.cancel(_Base::m_abc.enumerate(item))));
+      else
+        ss.put(item);
+    return ss.str();
   };
 };
 

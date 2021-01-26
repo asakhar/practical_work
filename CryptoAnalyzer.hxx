@@ -68,11 +68,10 @@ public:
 private:
   _Tp m_default;
 };
-
+template <typename Char_t>
 class Analyzer
 {
 private:
-  using Char_t = char;
   // unordered_map_with_default_value<Char_t, double> m_symb2freq{0};
   std::vector<
       unordered_map_with_default_value<std::basic_string<Char_t>, double>>
@@ -82,45 +81,57 @@ private:
   //     m_bigr2freq{0};
 
 public:
-  static void dump_double(std::ostream& st, double dbl)
+  template <typename _Ty>
+  static void dump(std::ostream& st, _Ty const& var, size_t count = 1)
   {
-    st.write(reinterpret_cast<char*>(&dbl), sizeof(double));
+    st.write(reinterpret_cast<char const*>(&var), sizeof(_Ty) * count);
+  }
+  template <typename _Ty>
+  static void restore(std::istream& st, _Ty& var, size_t count = 1)
+  {
+    st.read(reinterpret_cast<char*>(&var), sizeof(_Ty) * count);
   }
 
-  static double restore_double(std::istream& st, double& dbl)
-  {
-    st.read(reinterpret_cast<char*>(&dbl), sizeof(double));
-  }
+  // static void dump_double(std::basic_ostream<Char_t>& st, double dbl)
+  // {
+  //   st.write(reinterpret_cast<Char_t*>(&dbl), sizeof(double));
+  // }
+  // static void restore_double(std::basic_istream<Char_t>& st, double& dbl)
+  // {
+  //   st.read(reinterpret_cast<Char_t*>(&dbl), sizeof(double));
+  // }
 
   Analyzer() = default;
   Analyzer(std::string_view ngramms_filename, size_t max_n = 3)
   {
-    // load_freqs(freqs_filename);
-    // load_bigrs(bigrs_filename);
     for (auto i = 1ul; i <= max_n; i++)
-    {
       m_ngm2freq.emplace_back(0);
-      load_ngrs(ngramms_filename, i);
-    }
+    load_ngrs(ngramms_filename);
   };
 
-  void load_ngrs(std::string_view filename, size_t length)
+  void load_ngrs(std::string_view filename)
   {
     std::ifstream file{filename.data()};
     if (file.fail())
       throw std::runtime_error("File not found.");
     while (!file.bad() && !file.eof())
     {
-      std::basic_string<Char_t> symb1;
-      double freq;
-      std::getline(file, symb1, ';');
-      if (file.bad() || file.eof())
-        break;
+      size_t rows = 0;
+      restore(file, rows);
+      for (size_t i = 0; !file.bad() && !file.eof() && i < rows; i++)
+      {
+        uint8_t length_cur;
+        restore(file, length_cur);
+        Char_t tmp[256];
+        std::memset((void*)tmp, 0, sizeof(tmp));
+        restore(file, *tmp, length_cur);
+        if (file.bad() || file.eof())
+          break;
 
-      restore_double(file, freq);
-      file.get();
-      if (symb1.size() == length)
-        m_ngm2freq[length - 1][symb1] = freq;
+        double freq;
+        restore(file, freq);
+        m_ngm2freq[length_cur - 1][tmp] = freq;
+      }
     }
     file.close();
   }
@@ -242,7 +253,8 @@ public:
       file.close();
     }
   */
-  auto count_ngramms(std::basic_string_view<Char_t> msg, size_t length) const
+  auto count_ngramms(std::basic_string_view<Char_t> msg, size_t length,
+                     Alphabet<Char_t> const& abc) const
   {
     unordered_map_with_default_value<std::basic_string<Char_t>, double>
         resolved_freqs{0};
@@ -252,7 +264,7 @@ public:
       auto val = prev.tellp() - prev.tellg();
       if (val == length)
       {
-        char* copy = new char[length + 1];
+        Char_t* copy = new Char_t[length + 1];
         prev.read(copy, length);
         copy[length] = 0;
         prev.clear();
@@ -260,24 +272,18 @@ public:
         resolved_freqs[copy]++;
         delete[] copy;
       }
-      if (length == 1 && ch != '\0' && ch != ';')
+      if (abc.has(ch))
       {
         if constexpr (std::is_same_v<Char_t, char>)
           prev.put(static_cast<Char_t>(std::tolower(ch)));
-        else
-          prev.put(ch);
-      }
-      else if (ch != '\0' && ch != ' ' && ch != '\n' && ch != '.' &&
-               ch != ',' && ch != ':' && ch != ';' && ch != '\"' && ch != '\'')
-      {
-        if constexpr (std::is_same_v<Char_t, char>)
-          prev.put(static_cast<Char_t>(std::tolower(ch)));
+        else if constexpr (std::is_same_v<Char_t, wchar_t>)
+          prev.put(static_cast<Char_t>(std::towlower(ch)));
         else
           prev.put(ch);
       }
       else
       {
-        prev.str("");
+        prev.str(std::basic_string<Char_t>{});
       }
     }
     for (auto& item : resolved_freqs)
@@ -291,11 +297,12 @@ public:
       const
   {
     std::ofstream file{filename.data(), std::fstream::app};
+    dump(file, freqs.size());
     for (auto& item : freqs)
     {
-      file << item.first << ";";
-      dump_double(file, item.second);
-      file << "\n";
+      dump(file, (int8_t)item.first.size());
+      dump(file, *item.first.c_str(), item.first.size());
+      dump(file, item.second);
     }
     file.close();
   }
@@ -349,37 +356,38 @@ public:
   //   return static_cast<double>(res / rhs.size());
   // }
 
-  std::string try_analyze(std::string_view msg, double alpha, double beta,
-                          double precision, bool shuffle = true,
-                          bool only_letters = false) const
+  std::basic_string<Char_t> try_analyze(std::basic_string_view<Char_t> msg,
+                                        double alpha, double beta,
+                                        double precision, bool shuffle = true,
+                                        bool only_letters    = false,
+                                        Alphabet<Char_t> abc = {}) const
   {
     std::random_device rd;
     std::mt19937 rand(rd());
-
-    Alphabet abc;
-    abc.update_from_text(msg.data());
+    if (abc.size() == 0)
+      abc.update_from_text(msg.data());
     auto initial = abc.getLetters();
     auto guessed = initial;
     if (shuffle)
       std::shuffle(guessed.begin(), guessed.end(), rand);
 
-    SubstitutionCipher cipher;
+    SubstitutionCipher<Char_t> cipher;
     cipher.updateAbc(abc);
     cipher.updateKey({initial, guessed, abc});
 
-    std::string guess_msg = cipher.decode(msg);
-    auto resolved_3gr     = count_ngramms(guess_msg, 3);
-    auto resolved_1gr     = count_ngramms(guess_msg, 1);
-    auto resolved_2gr     = count_ngramms(guess_msg, 2);
-    double mse_3gramms    = 0;
-    double mse_1gramms    = 0;
-    double mse_2gramms    = 0;
+    auto guess_msg     = cipher.decode(msg);
+    auto resolved_3gr  = count_ngramms(guess_msg, 3, abc);
+    auto resolved_1gr  = count_ngramms(guess_msg, 1, abc);
+    auto resolved_2gr  = count_ngramms(guess_msg, 2, abc);
+    double mse_3gramms = 0;
+    double mse_1gramms = 0;
+    double mse_2gramms = 0;
     double total_mse;
 #define RECALCULATE()                                                          \
   guess_msg    = cipher.decode(msg);                                           \
-  resolved_3gr = count_ngramms(guess_msg, 3);                                  \
-  resolved_1gr = count_ngramms(guess_msg, 1);                                  \
-  resolved_2gr = count_ngramms(guess_msg, 2);                                  \
+  resolved_3gr = count_ngramms(guess_msg, 3, abc);                             \
+  resolved_1gr = count_ngramms(guess_msg, 1, abc);                             \
+  resolved_2gr = count_ngramms(guess_msg, 2, abc);                             \
   mse_2gramms  = calc_mean_abs_error(m_ngm2freq[1], resolved_2gr);             \
   mse_1gramms  = calc_mean_abs_error(m_ngm2freq[0], resolved_1gr);             \
   mse_3gramms  = calc_mean_abs_error(m_ngm2freq[2], resolved_3gr);             \
@@ -387,6 +395,10 @@ public:
               (1 - alpha - beta) * mse_3gramms;
 
     RECALCULATE();
+
+#if DEBUG
+    std::cout << "\n\n\n";
+#endif
     while (total_mse > precision)
     {
       auto prev_mse = total_mse;
@@ -410,43 +422,49 @@ public:
       }
 #ifdef DEBUG
       if (prev_mse != total_mse)
-        std::cout << "\n\n\nTotal_mse: " << std::setprecision(9) << total_mse
-                  << "    Mse_letters: " << std::setprecision(9) << mse_1gramms
-                  << "    Mse_bigramms: " << std::setprecision(9) << mse_2gramms
-                  << "    Mse_3gramms: " << std::setprecision(9) << mse_3gramms
-                  << "\n\n"
-                  << guess_msg << std::endl;
+        std::cout << "\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                     "\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                     "\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                  << " Total_mse: " << std::setprecision(9) << total_mse
+                  << " Mse_letters: " << std::setprecision(9) << mse_1gramms
+                  << " Mse_bigramms: " << std::setprecision(9) << mse_2gramms
+                  << " Mse_3gramms: " << std::setprecision(9) << mse_3gramms
+                  << " Required precision:" << precision << std::flush;
 #endif
     }
+#if DEBUG
+    std::cout << "\n\n\n" << std::flush;
+#endif
     return guess_msg;
   }
 
-  std::string try_analyze_affine(std::string_view msg, double alpha,
-                                 double beta, Alphabet abc) const
+  std::basic_string<Char_t>
+  try_analyze_affine(std::basic_string_view<Char_t> msg, double alpha,
+                     double beta, double treshold, Alphabet<Char_t> abc) const
   {
-    AffineCipher cipher;
+    AffineCipher<Char_t> cipher;
     cipher.updateAbc(abc);
     int64_t alpha_k = 1, beta_k = 0;
     cipher.updateKey(AffineKey{alpha_k, beta_k, abc.size()});
 
-    std::string guess_msg = cipher.decode(msg);
-    auto resolved_3gr     = count_ngramms(guess_msg, 3);
-    auto resolved_1gr     = count_ngramms(guess_msg, 1);
-    auto resolved_2gr     = count_ngramms(guess_msg, 2);
-    double mse_3gramms    = 0;
-    double mse_1gramms    = 0;
-    double mse_2gramms    = 0;
+    std::basic_string<Char_t> guess_msg = cipher.decode(msg);
+    auto resolved_3gr                   = count_ngramms(guess_msg, 3, abc);
+    auto resolved_1gr                   = count_ngramms(guess_msg, 1, abc);
+    auto resolved_2gr                   = count_ngramms(guess_msg, 2, abc);
+    double mse_3gramms                  = 0;
+    double mse_1gramms                  = 0;
+    double mse_2gramms                  = 0;
     double total_mse;
 
     RECALCULATE();
-    #if DEBUG
-      std::cout << "\n\n\n";
-    #endif
+#if DEBUG
+    std::wcout << L"\n\n\n";
+#endif
     for (; alpha_k < abc.size(); alpha_k++)
     {
       if (std::__gcd(static_cast<size_t>(alpha_k), abc.size()) != 1)
         continue;
-      for (beta_k = 0; beta_k < abc.size(); beta_k++)
+      for (beta_k = 0; beta_k < abc.size() && total_mse > treshold; beta_k++)
       {
         auto prev_mse = total_mse;
         auto prev_key = cipher.getKey();
@@ -454,28 +472,114 @@ public:
 
         RECALCULATE();
 
+#ifdef DEBUG
+        std::wcout << L"\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                      L"\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                      L"\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                      L"\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                      L"\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                      L"\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                      L"\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                      L"\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                      L"\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                   << L" Total_mse: " << std::setw(12) << total_mse
+                   << L" Min_mse: " << std::setw(12)
+                   << prev_mse
+                   //  << L" Treshold: " << std::setw(12) << treshold
+                   << L" Mse_letters: " << std::setw(12) << mse_1gramms
+                   << L" Mse_bigramms: " << std::setw(12) << mse_2gramms
+                   << L" Mse_3gramms: " << std::setw(12) << mse_3gramms
+                   << L" Alpha:" << alpha_k << L" Beta:" << beta_k << L"  "
+                   << std::flush;
+#endif
         if (total_mse > prev_mse)
         {
           cipher.updateKey(prev_key);
           total_mse = prev_mse;
         }
-#ifdef DEBUG
-          std::cout << "\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
-                       "\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
-                       "\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
-                    << " Total_mse: " << std::setprecision(9) << total_mse
-                    << " Mse_letters: " << std::setprecision(9)
-                    << mse_1gramms
-                    << " Mse_bigramms: " << std::setprecision(9)
-                    << mse_2gramms
-                    << " Mse_3gramms: " << std::setprecision(9)
-                    << mse_3gramms 
-                    << " Alpha:" << alpha_k
-                    << " Beta:" << beta_k << "  "
-                    << std::flush;
-#endif
       }
     }
+#if DEBUG
+    std::wcout << L"\n\n\n" << std::flush;
+#endif
+    return cipher.decode(msg);
+  }
+
+  std::basic_string<Char_t>
+  try_analyze_raffine(std::basic_string_view<Char_t> msg, double alpha,
+                      double beta, double treshold, Alphabet<Char_t> abc) const
+  {
+    AffineRecursiveCipher<Char_t> cipher;
+    cipher.updateAbc(abc);
+    int64_t alpha_1 = 7, beta_1 = 0, alpha_2 = 3, beta_2 = 0;
+    cipher.updateKey(AffineRecursiveKey{{alpha_1, beta_1, abc.size()},
+                                        {alpha_2, beta_2, abc.size()}});
+
+    std::basic_string<Char_t> guess_msg = cipher.decode(msg);
+    auto resolved_3gr                   = count_ngramms(guess_msg, 3, abc);
+    auto resolved_1gr                   = count_ngramms(guess_msg, 1, abc);
+    auto resolved_2gr                   = count_ngramms(guess_msg, 2, abc);
+    double mse_3gramms                  = 0;
+    double mse_1gramms                  = 0;
+    double mse_2gramms                  = 0;
+    double total_mse;
+
+    RECALCULATE();
+#if DEBUG
+    std::wcout << L"\n\n\n";
+#endif
+    for (; alpha_2 < abc.size(); alpha_2++)
+    {
+      if (std::__gcd(static_cast<size_t>(alpha_2), abc.size()) != 1)
+        continue;
+      for (; alpha_1 < abc.size(); alpha_1++)
+      {
+        if (std::__gcd(static_cast<size_t>(alpha_1), abc.size()) != 1)
+          continue;
+        for (beta_1 = 0; beta_1 < abc.size(); beta_1++)
+        {
+          for (beta_2 = 0; beta_2 < abc.size() && total_mse > treshold;
+               beta_2++)
+          {
+            auto prev_mse = total_mse;
+            auto prev_key = cipher.getKey();
+            cipher.updateKey(
+                {{alpha_1, beta_1, abc.size()}, {alpha_2, beta_2, abc.size()}});
+
+            RECALCULATE();
+
+#ifdef DEBUG
+            std::wcout
+                << L"\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                   L"\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                   L"\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                   L"\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                   L"\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                   L"\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                   L"\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                   L"\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                   L"\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r\r"
+                << L" Total_mse: " <<    std::setw(10) << total_mse
+                << L" Min_mse: " <<      std::setw(10) << prev_mse
+                << L" Mse_letters: " <<  std::setw(10) << mse_1gramms
+                << L" Mse_bigramms: " << std::setw(10) << mse_2gramms
+                << L" Mse_3gramms: " <<  std::setw(10) << mse_3gramms
+                << L" Alpha1:" << alpha_1 << L" Beta1:" << beta_1 << L"  "
+                << L" Alpha2:" << alpha_2 << L" Beta2:" << beta_2 << L"  "
+                << std::flush;
+#endif
+            if (total_mse > prev_mse)
+            {
+              cipher.updateKey(prev_key);
+              total_mse = prev_mse;
+            }
+          }
+        }
+      }
+    }
+#if DEBUG
+    std::wcout << L"\n\n\n" << std::flush;
+#endif
     return cipher.decode(msg);
   }
 };

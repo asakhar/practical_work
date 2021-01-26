@@ -15,31 +15,36 @@ struct AffineRecursiveKey
     key2 = nexta;
   }
 };
-
-class AffineRecursiveCipher : public Cipher<AffineRecursiveKey>
+template<typename Char_t= wchar_t>
+class AffineRecursiveCipher : public Cipher<AffineRecursiveKey, Char_t>
 {
+  using _Base = Cipher<AffineRecursiveKey, Char_t>;
 public:
-  std::string encode(std::string_view msg) const override
+  std::basic_string<Char_t> encode(std::basic_string_view<Char_t> msg) const override
   {
-    auto encmsg = m_abc.enumerate(msg);
-    std::basic_stringstream<int64_t> ss;
-    for (auto ckey = m_key; auto item : encmsg)
+    std::basic_stringstream<Char_t> ss;
+    for (auto ckey = _Base::m_key; auto item : msg)
     {
-      ss.put(ckey.apply(item));
+      if(_Base::m_abc.has(item))
+        ss.put(_Base::m_abc.get(ckey.apply(_Base::m_abc.enumerate(item))));
+      else
+        ss.put(item);
       ckey.next();
     }
-    return m_abc.get(ss.str());
+    return ss.str();
   };
-  std::string decode(std::string_view msg) const override
+  std::basic_string<Char_t> decode(std::basic_string_view<Char_t> msg) const override
   {
-    auto encmsg = m_abc.enumerate(msg);
-    std::basic_stringstream<int64_t> ss;
-    for (auto ckey = m_key; auto item : encmsg)
+    std::basic_stringstream<Char_t> ss;
+    for (auto ckey = _Base::m_key; auto item : msg)
     {
-      ss.put(ckey.cancel(item));
+      if(_Base::m_abc.has(item))
+        ss.put(_Base::m_abc.get(ckey.cancel(_Base::m_abc.enumerate(item))));
+      else
+        ss.put(item);
       ckey.next();
     }
-    return m_abc.get(ss.str());
+    return ss.str();
   };
 };
 

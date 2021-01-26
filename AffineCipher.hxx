@@ -110,7 +110,6 @@ public:
   bool operator==(RingElem ot) const { return value == ot.value; }
   bool operator!=(RingElem ot) const { return value != ot.value; }
 };
-
 class AffineKey
 {
 private:
@@ -131,29 +130,35 @@ public:
   friend class AffineRecursiveKey;
 };
 
-class AffineCipher : public Cipher<AffineKey>
+template<typename Char_t = wchar_t>
+class AffineCipher : public Cipher<AffineKey, Char_t>
 {
+  using _Base = Cipher<AffineKey, Char_t>;
 public:
   AffineCipher() = default;
-  AffineCipher(Alphabet const& abc, int64_t alpha, int64_t beta) {
+  AffineCipher(Alphabet<Char_t> const& abc, int64_t alpha, int64_t beta) {
     updateAbc(abc);
     updateKey({alpha, beta, abc.size()});
   }
-  std::string encode(std::string_view msg) const override
+  std::basic_string<Char_t> encode(std::basic_string_view<Char_t> msg) const override
   {
-    auto encmsg = m_abc.enumerate(msg);
-    std::basic_stringstream<int64_t> ss;
-    for (auto item : encmsg)
-      ss.put(m_key.apply(item));
-    return m_abc.get(ss.str());
+    std::basic_stringstream<Char_t> ss;
+    for (auto item : msg)
+      if(_Base::m_abc.has(item))
+        ss.put(_Base::m_abc.get(_Base::m_key.apply(_Base::m_abc.enumerate(item))));
+      else
+        ss.put(item);
+    return ss.str();
   };
-  std::string decode(std::string_view msg) const override
+  std::basic_string<Char_t> decode(std::basic_string_view<Char_t> msg) const override
   {
-    auto encmsg = m_abc.enumerate(msg);
-    std::basic_stringstream<int64_t> ss;
-    for (auto item : encmsg)
-      ss.put(m_key.cancel(item));
-    return m_abc.get(ss.str());
+    std::basic_stringstream<Char_t> ss;
+    for (auto item : msg)
+      if(_Base::m_abc.has(item))
+        ss.put(_Base::m_abc.get(_Base::m_key.cancel(_Base::m_abc.enumerate(item))));
+      else
+        ss.put(item);
+    return ss.str();
   };
 };
 
