@@ -124,6 +124,7 @@ public:
   inline void updateKey(Key_t&& key) { m_key = std::forward<Key_t>(key); }
 
   inline Key_t const& getKey() const { return m_key; }
+  inline Alphabet<Char_t> const& getAbc() const { return m_abc; }
   inline void updateAbc(Alphabet<Char_t> const& abc) { m_abc = abc; }
   inline void updateAbc(Alphabet<Char_t>&& abc)
   {

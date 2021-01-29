@@ -11,8 +11,15 @@ struct AffineRecursiveKey
   void next()
   {
     AffineKey nexta{key1.alpha * key2.alpha, key1.beta + key2.beta};
+    // std::wcout << L"Следующий ключ: 𝝰 = " << nexta.alpha << "; 𝞫 = " << nexta.beta << ".";
     key1 = key2;
     key2 = nexta;
+  }
+  AffineKey const& getKey1() const {
+    return key1;
+  }
+  AffineKey const& getKey2() const {
+    return key2;
   }
 };
 template<typename Char_t= wchar_t>

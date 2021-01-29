@@ -3,6 +3,7 @@
 
 #include "Cipher.hxx"
 #include <cassert>
+#include <iostream>
 template <std::integral Int>
 class RingElem
 {
@@ -12,14 +13,14 @@ private:
 
 public:
   RingElem() = default;
-  RingElem(Int val, Int mod) : value{val % mod}, modulo{mod}
+  constexpr RingElem(Int val, Int mod) : value{val % mod}, modulo{mod}
   {
     assert(mod > 0 && "Modulo can't be less than 1.");
     if (value < 0)
       value += modulo;
   };
-  RingElem(RingElem const&) = default;
-  RingElem(RingElem&&)      = default;
+  constexpr RingElem(RingElem const&) = default;
+  constexpr RingElem(RingElem&&)      = default;
 
   RingElem& operator=(RingElem const& ot)
   {
@@ -117,15 +118,31 @@ private:
 
 public:
   AffineKey() = default;
-  AffineKey(RingElem<int64_t> a, RingElem<int64_t> b) : alpha{a}, beta{b} {};
-  AffineKey(int64_t a, int64_t b, int64_t m) : alpha{a, m}, beta{b, m} {};
+  constexpr AffineKey(RingElem<int64_t> a, RingElem<int64_t> b) : alpha{a}, beta{b} {};
+  constexpr AffineKey(int64_t a, int64_t b, int64_t m) : alpha{a, m}, beta{b, m} {};
   int64_t apply(int64_t in) const
   {
+
+    auto res = static_cast<int64_t>(alpha * (in - 1) + beta) + 1;
+    // int64_t inva = (~alpha).getValue();
+    // std::wcout << L"\nБуква '" << (wchar_t)(L'a'+in-1) << L"' имеет номер '" << in-1 << L"' => номер результирующего символа будет равен " << alpha.getValue() << L"x" << in-1 << L"+" << beta.getValue() << L" mod " << alpha.getModulo() << L" = " << (res-1) << L". Буква: '" << (wchar_t)(L'a'+res-1) << L"'\n";
+    
     return static_cast<int64_t>(alpha * (in - 1) + beta) + 1;
   }
   int64_t cancel(int64_t out) const
   {
+    // auto res = static_cast<int64_t>((-beta + (out - 1)) * ~alpha) + 1;
+    // int64_t inva = (~alpha).getValue();
+    // std::wcout << L"\nБуква '" << (wchar_t)(L'a'+out-1) << L"' имеет номер '" << out-1 << L"' => номер результирующего символа будет равен " << inva << L"x(" << out-1 << L"-" << beta.getValue() << L") mod " << alpha.getModulo() << L" = " << (res) << L". Буква: '" << (wchar_t)(L'a'+res-1) << L"'\n";
+    // auto res = static_cast<int64_t>((-beta + (out - 1)) * ~alpha) + 1;
+    // std::wcout << L"\n𝝰^-1 = " << alpha.getValue() << L"^-1 = " << (~alpha).getValue() << L"\n" << L"Буква '" << (wchar_t)(L'a'+out-1) << L"' имеет номер '" << out-1 << L"' => номер результирующего символа будет равен " << (~alpha).getValue() << L"x(" << out-1 << L"-" << beta.getValue() << L") mod " << alpha.getModulo() << L" = " << (res-1) << L". Буква: '" << (wchar_t)(L'a'+res-1) << L"'\n";
     return static_cast<int64_t>((-beta + (out - 1)) * ~alpha) + 1;
+  }
+  int64_t getAlpha() const {
+    return alpha.getValue();
+  }
+  int64_t getBeta() const {
+    return beta.getValue();
   }
   friend class AffineRecursiveKey;
 };

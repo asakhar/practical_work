@@ -8,8 +8,15 @@
 
 using std::literals::string_view_literals::operator""sv;
 
-static constexpr auto text = L"Какой-то текст! Blah-blah-blah."sv;
-static constexpr auto abc_expr = L"A-Za-zА-Яа-я"sv;
+static constexpr auto text = L"underground"sv;
+// static constexpr auto text = L"this is text. i have no imagination. halp"sv;
+// static constexpr auto abc_expr = L"A-Za-zА-Яа-я"sv;
+static constexpr auto abc_expr = L"a-z"sv;
+static constexpr auto abc_shuffled = L"ejxpvtymlwhruacqbfogzisdnk"sv;
+
+static constexpr auto affine_key = AffineKey{3, 7, 26};
+static constexpr auto affine_rec_key =
+    AffineRecursiveKey{{25, 3, 26}, {23, 7, 26}};
 
 int example1(Alphabet<wchar_t> const& abc)
 {
@@ -17,8 +24,10 @@ int example1(Alphabet<wchar_t> const& abc)
   subcipher.updateAbc(abc);
 
   auto initabc = abc.getLetters();
-  auto shufabc = initabc;
-  std::shuffle(shufabc.begin(), shufabc.end(), std::random_device{});
+  auto shufabc = abc_shuffled;
+  // std::shuffle(shufabc.begin(), shufabc.end(), std::random_device{});
+  std::wcout << L"\n\nSubstitution key:\n " << initabc << L"\n " << shufabc
+             << L"\n\n";
   subcipher.updateKey(
       {std::wstring_view{initabc}, std::wstring_view{shufabc}, abc});
 
@@ -30,16 +39,20 @@ int example1(Alphabet<wchar_t> const& abc)
 
   return 0;
 }
-int example2(Alphabet<wchar_t> const& abc)
+int example2(Alphabet<wchar_t> const& abc1)
 {
   AffineCipher cipher;
+  Alphabet abc{L"a-z"sv, true};
   cipher.updateAbc(abc);
 
-  cipher.updateKey({7, 3, (int64_t)abc.size()});
-
-  std::wcout << L"Affine cipher result:\n " << cipher.encode(text) << std::endl;
+  cipher.updateKey(affine_key);
+  auto text1 = L"underground";
+  std::wcout << L"Affine key: alpha = " << affine_key.getAlpha() << L", beta = "
+             << affine_key.getBeta() <<L"\n";
+  std::wcout << L"Affine cipher result:\n " << cipher.encode(text1)
+             << std::endl;
   std::wcout << L"\nAffine cipher recovered:\n "
-             << cipher.decode(cipher.encode(text)) << L"\n"
+             << cipher.decode(cipher.encode(text1)) << L"\n"
              << std::endl;
   return 0;
 }
@@ -48,8 +61,11 @@ int example3(Alphabet<wchar_t> const& abc)
   AffineRecursiveCipher cipher;
   cipher.updateAbc(abc);
 
-  cipher.updateKey({{(int64_t)abc.size() - 1, 3, (int64_t)abc.size()},
-                    {(int64_t)abc.size() - 3, 7, (int64_t)abc.size()}});
+  cipher.updateKey(affine_rec_key);
+
+  std::wcout << L"Affine recursive first key pair:\n Key1:\n  alpha = " << affine_rec_key.getKey1().getAlpha() << L", beta = "
+             << affine_rec_key.getKey1().getBeta() <<L"\n Key2:\n  alpha = " << affine_rec_key.getKey2().getAlpha() << L", beta = "
+             << affine_rec_key.getKey2().getBeta() <<L"\n";
 
   std::wcout << L"Affine recursive cipher result:\n " << cipher.encode(text)
              << std::endl;
@@ -91,21 +107,37 @@ int example4(Alphabet<wchar_t> const& abc)
   return 0;
 }
 
-
-int example5(Alphabet<wchar_t> const& abc1)
+int example5(Alphabet<wchar_t> const& abc)
 {
   AffineRecursiveCipher cipher;
-  Alphabet abc{L"a-z"sv, true};
+  // Alphabet abc{L"a-z"sv, true};
   cipher.updateAbc(abc);
 
-  cipher.updateKey({{7, 3, (int64_t)abc.size()}, {3, 15, (int64_t)abc.size()}});
+  cipher.updateKey({{3, 5, (int64_t)abc.size()}, {7, 13, (int64_t)abc.size()}});
 
   Analyzer<wchar_t> an{"../ngramms.csv"};
 
   auto result = an.try_analyze_raffine(cipher.encode(std::wstring_view{
 #include "testtext.txt"
+                                       }),
+                                       0.2, 0, 0.0009, abc);
+
+  std::wcout << result << std::endl;
+  return 0;
+}
+
+int example6(Alphabet<wchar_t> const& abc) {
+  AffineCipher cipher;
+  cipher.updateAbc(abc);
+
+  cipher.updateKey({7, 3, (int64_t)abc.size()});
+
+  Analyzer<wchar_t> an{"../ngramms.csv"};
+
+  auto result = an.try_analyze_affine(cipher.encode(std::wstring_view{
+#include "testtext.txt"
                                       }),
-                                      0.2, 0, 0.0009, abc);
+                                      0.3, 0.2, 0.000001, abc);
 
   std::wcout << result << std::endl;
   return 0;
@@ -115,10 +147,12 @@ int main(int argc, char const* argv[])
 {
   setlocale(LC_ALL, "");
   Alphabet abc{abc_expr, true};
-  example1(abc);
-  example2(abc);
-  example3(abc);
-  example5(abc);
+  // example1(abc);
+  // example2(abc);
+  // example3(abc);
+  // example4(abc);
+  // example5(abc);
+  example6(abc);
 
   return 0;
 }
